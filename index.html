@@ -104,6 +104,25 @@ function mergeShortSegments(input,p){
  }
  return groups;
 }
+// Simplify only short display fragments inside a whole slope; keep raw children intact.
+function mergeProfileParts(input,p){
+ const groups=input.map(part=>({...part})),minimum=segmentMinimum(p);
+ const join=i=>{const a=groups[i],b=groups[i+1];a.end=b.end;a.z1=b.z1;updateSegment(a,p);groups.splice(i+1,1);};
+ let i=0;
+ while(i<groups.length){
+  const current=groups[i],left=groups[i-1],right=groups[i+1];
+  if(left&&left.type===current.type){join(i-1);i=Math.max(0,i-2);continue;}
+  if(current.length<minimum-1e-6&&groups.length>1){
+   if(left&&right&&left.type===right.type){join(i);join(i-1);i=Math.max(0,i-2);continue;}
+   let neighbor;
+   if(!left)neighbor=i+1;else if(!right)neighbor=i-1;
+   else{const dl=Math.abs(current.grade-left.grade),dr=Math.abs(current.grade-right.grade);neighbor=dl<dr||(Math.abs(dl-dr)<1e-9&&left.length>=right.length)?i-1:i+1;}
+   const start=Math.min(i,neighbor);join(start);i=Math.max(0,start-1);continue;
+  }
+  i++;
+ }
+ return groups;
+}
 function analyze(src,p){
  const edges=[],segments=[],drawTracks=[],totals=TYPES.map(()=>0);
  let offset=0,ascent=0,descent=0,min=Infinity,max=-Infinity,maxUp=0,maxDown=0,rawSegmentCount=0,shortTracks=0;
@@ -132,7 +151,10 @@ function analyze(src,p){
   }
   offset+=length;
  }
- return {edges,segments,drawTracks,totals,distance:offset,ascent,descent,min,max,maxUp,maxDown,rawSegmentCount,shortTracks,p};
+ const mergedProfiles=segments.flatMap(parent=>mergeProfileParts(parent.children,p).map((part,i)=>({...part,parentId:parent.id,partIndex:i+1})));
+ let profile=0;
+ for(const edge of edges){while(profile<mergedProfiles.length-1&&edge.start>=mergedProfiles[profile].end-1e-6)profile++;edge.profileIndex=profile;}
+ return {edges,segments,mergedProfiles,drawTracks,totals,distance:offset,ascent,descent,min,max,maxUp,maxDown,rawSegmentCount,shortTracks,p};
 }
 
 function legend(p){const ranges=[`|坡度| < ${p.flat}%`,`${p.flat}% 至 < ${p.steep}%`,`≥ ${p.steep}%`,`−${p.steep}% 至 −${p.flat}%`,`≤ −${p.steep}%`];$('legend').innerHTML=TYPES.map((t,i)=>`<div class="legend-row"><span><i class="dot" style="background:${t.color}"></i>${t.name}</span><small>${ranges[i]}</small></div>`).join('');}
@@ -201,13 +223,13 @@ function updateZoomControls(view){
  $('zoom-out').disabled=full;$('zoom-reset').disabled=full;
  $('view-range').textContent=has?`${(view.start/1000).toFixed(2)}–${(view.end/1000).toFixed(2)} km · ${full?'全程':(result.distance/span).toFixed(1)+'×'}`:'全程视图';
 }
-function profileColor(edge){return profileMode==='merged'?DIRECTIONS[result.segments[edge.parentId-1].direction].color:TYPES[edge.type].color;}
-function profileSections(){if(!result)return [];return profileMode==='merged'?result.segments.map(s=>({...s,label:`${DIRECTIONS[s.direction].symbol} ${DIRECTIONS[s.direction].name} ${s.id}`,color:DIRECTIONS[s.direction].color})):result.segments.flatMap(s=>s.children.map((c,i)=>({...c,label:`${TYPES[c.type].name} ${s.id}.${i+1}`,color:TYPES[c.type].color})));}
+function profileColor(edge){return TYPES[profileMode==='merged'?result.mergedProfiles[edge.profileIndex].type:edge.type].color;}
+function profileSections(){if(!result)return [];return profileMode==='merged'?result.mergedProfiles.map(s=>({...s,label:`${TYPES[s.type].name} ${s.parentId}.${s.partIndex}`,color:TYPES[s.type].color})):result.segments.flatMap(s=>s.children.map((c,i)=>({...c,label:`${TYPES[c.type].name} ${s.id}.${i+1}`,color:TYPES[c.type].color})));}
 function updateProfileControls(){
  $('view-merged').setAttribute('aria-pressed',String(profileMode==='merged'));$('view-detailed').setAttribute('aria-pressed',String(profileMode==='detailed'));
- const items=profileMode==='merged'?[DIRECTIONS.up,DIRECTIONS.down,DIRECTIONS.flat]:TYPES;
+ const items=TYPES;
  $('profile-legend').innerHTML=items.map(t=>`<span><i class="dot" style="background:${t.color}"></i>${t.name}</span>`).join('');
- $('profile-hint').textContent=profileMode==='merged'?'按完整上坡、下坡和平路统一着色，减少零碎色块。':'按内部缓坡、陡坡和平路着色，保留各子段的真实变化。';
+ $('profile-hint').textContent=profileMode==='merged'?'保留缓坡、陡坡五类区分，按最短长度合并内部短碎段；不将整座坡统一涂色。':'按内部缓坡、陡坡和平路着色，保留各子段的真实变化。';
 }
 function setProfileMode(mode){if(mode!=='merged'&&mode!=='detailed')return;profileMode=mode;clearGesture();hover=null;$('tooltip').style.display='none';draw();}
 function draw(){
@@ -249,7 +271,7 @@ function showHover(event){
  if(px<pad.left||px>pad.left+pw||py<pad.top||py>pad.top+ph){hideHover();return;}
  const s=Math.max(start,Math.min(end,start+(px-pad.left)/pw*(end-start))),edge=result.edges[firstEdgeAt(s)],z=edgeElevation(edge,s);
  hover={s,z,edge};const tip=$('tooltip');
- const parent=result.segments[edge.parentId-1];const main=`第 ${parent.id} 段 ${DIRECTIONS[parent.direction].name} · 整坡 ${gradeText(parent.grade)}`,detail=`${TYPES[edge.type].name} · 子段 ${gradeText(edge.segmentGrade)}`;tip.innerHTML=`<strong>${(s/1000).toFixed(3)} km · ${z.toFixed(1)} m</strong><br>${profileMode==='merged'?main:detail}<br>${profileMode==='merged'?`${(parent.start/1000).toFixed(3)}–${(parent.end/1000).toFixed(3)} km`:main}<br>当前位置坡度 ${gradeText(edge.grade)}`;
+ const parent=result.segments[edge.parentId-1],merged=result.mergedProfiles[edge.profileIndex];const main=`第 ${parent.id} 段 ${DIRECTIONS[parent.direction].name} · 整坡 ${gradeText(parent.grade)}`,detail=`${TYPES[edge.type].name} · 子段 ${gradeText(edge.segmentGrade)}`;tip.innerHTML=`<strong>${(s/1000).toFixed(3)} km · ${z.toFixed(1)} m</strong><br>${profileMode==='merged'?`${TYPES[merged.type].name} · 合并子段 ${gradeText(merged.grade)}`:detail}<br>${main}<br>当前位置坡度 ${gradeText(edge.grade)}`;
  tip.style.display='block';tip.style.left=Math.max(4,Math.min(px+14,box.width-tip.offsetWidth-4))+'px';tip.style.top=Math.max(0,Math.min(py-55,box.height-tip.offsetHeight-5))+'px';draw();
 }
 function hideHover(){hover=null;$('tooltip').style.display='none';draw();}

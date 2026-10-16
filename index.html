@@ -156,7 +156,7 @@ function analyze(src,p){
   }
   offset+=length;
  }
- const mergedProfiles=segments.flatMap(parent=>mergeProfileParts(parent.children,p).map((part,i)=>({...part,parentId:parent.id,partIndex:i+1})));
+ const mergedProfiles=segments.flatMap(parent=>mergeProfileParts(parent.children,p).map((part,i)=>({...part,parentId:parent.id,partIndex:i+1}))).map((part,i)=>({...part,number:i+1}));
  let profile=0;
  for(const edge of edges){while(profile<mergedProfiles.length-1&&edge.start>=mergedProfiles[profile].end-1e-6)profile++;edge.profileIndex=profile;}
  return {edges,segments,mergedProfiles,drawTracks,totals,distance:offset,ascent,descent,min,max,maxUp,maxDown,rawSegmentCount,shortTracks,p};
@@ -168,8 +168,9 @@ function displaySegments(r,mode=profileMode){
  if(!r)return [];
  return mode==='merged'?r.mergedProfiles:r.segments.flatMap(s=>s.children.map((c,i)=>({...c,parentId:s.id,partIndex:i+1})));
 }
+function slopeNumber(s,mode=profileMode){return mode==='merged'?String(s.number):`${s.parentId}.${s.partIndex}`;}
 function renderSegmentRows(r,mode=profileMode){
- return displaySegments(r,mode).map(s=>`<tr data-slope-id="${s.parentId}.${s.partIndex}"><td>${s.parentId}.${s.partIndex}<small class="child-count">整坡 ${s.parentId}</small></td><td><span><i class="dot" style="background:${TYPES[s.type].color}"></i>${TYPES[s.type].name}</span></td><td>${(s.start/1000).toFixed(3)} – ${(s.end/1000).toFixed(3)}</td><td>${s.length.toFixed(1)}</td><td>${gradeText(s.grade)}<small class="child-count">${mode==='merged'?'合并子段':'原始子段'}平均</small></td><td>${s.change>0?'+':''}${s.change.toFixed(1)}</td></tr>`).join('');
+ return displaySegments(r,mode).map(s=>`<tr data-slope-id="${slopeNumber(s,mode)}"><td>${slopeNumber(s,mode)}${mode==='detailed'?`<small class="child-count">整坡 ${s.parentId}</small>`:''}</td><td><span><i class="dot" style="background:${TYPES[s.type].color}"></i>${TYPES[s.type].name}</span></td><td>${(s.start/1000).toFixed(3)} – ${(s.end/1000).toFixed(3)}</td><td>${s.length.toFixed(1)}</td><td>${gradeText(s.grade)}<small class="child-count">${mode==='merged'?'合并子段':'原始子段'}平均</small></td><td>${s.change>0?'+':''}${s.change.toFixed(1)}</td></tr>`).join('');
 }
 function renderSlopeTable(){
  const modeName=profileMode==='merged'?'合并':'详细';
@@ -203,7 +204,7 @@ function apply(){try{
 }catch(e){status(e.message,true);}}
 function segmentCsv(r,mode=profileMode){
  const header=['展示模式','坡段编号','完整坡段ID','轨迹段','类型','起点_km','终点_km','长度_m','平均坡度_%','起点海拔_m','终点海拔_m','海拔变化_m'];
- const rows=[header,...displaySegments(r,mode).map(s=>[mode==='merged'?'合并坡段':'详细坡段',`${s.parentId}.${s.partIndex}`,s.parentId,s.track+1,TYPES[s.type].name,(s.start/1000).toFixed(4),(s.end/1000).toFixed(4),s.length.toFixed(2),s.grade.toFixed(3),s.z0.toFixed(2),s.z1.toFixed(2),s.change.toFixed(2)])];
+ const rows=[header,...displaySegments(r,mode).map(s=>[mode==='merged'?'合并坡段':'详细坡段',slopeNumber(s,mode),s.parentId,s.track+1,TYPES[s.type].name,(s.start/1000).toFixed(4),(s.end/1000).toFixed(4),s.length.toFixed(2),s.grade.toFixed(3),s.z0.toFixed(2),s.z1.toFixed(2),s.change.toFixed(2)])];
  return rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
 }
 
@@ -234,7 +235,7 @@ function updateZoomControls(view){
  $('view-range').textContent=has?`${(view.start/1000).toFixed(2)}–${(view.end/1000).toFixed(2)} km · ${full?'全程':(result.distance/span).toFixed(1)+'×'}`:'全程视图';
 }
 function profileColor(edge){return TYPES[profileMode==='merged'?result.mergedProfiles[edge.profileIndex].type:edge.type].color;}
-function profileSections(){return displaySegments(result).map(s=>({...s,label:`${TYPES[s.type].name} ${s.parentId}.${s.partIndex}`,color:TYPES[s.type].color}));}
+function profileSections(){return displaySegments(result).map(s=>({...s,label:`${TYPES[s.type].name} ${slopeNumber(s)}`,color:TYPES[s.type].color}));}
 function updateProfileControls(){
  $('view-merged').setAttribute('aria-pressed',String(profileMode==='merged'));$('view-detailed').setAttribute('aria-pressed',String(profileMode==='detailed'));
  const items=TYPES;
@@ -281,7 +282,7 @@ function showHover(event){
  if(px<pad.left||px>pad.left+pw||py<pad.top||py>pad.top+ph){hideHover();return;}
  const s=Math.max(start,Math.min(end,start+(px-pad.left)/pw*(end-start))),edge=result.edges[firstEdgeAt(s)],z=edgeElevation(edge,s);
  hover={s,z,edge};const tip=$('tooltip');
- const parent=result.segments[edge.parentId-1],merged=result.mergedProfiles[edge.profileIndex];const main=`第 ${parent.id} 段 ${DIRECTIONS[parent.direction].name} · 整坡 ${gradeText(parent.grade)}`,detail=`${parent.id}.${edge.childIndex} ${TYPES[edge.type].name} · 子段 ${gradeText(edge.segmentGrade)}`;tip.innerHTML=`<strong>${(s/1000).toFixed(3)} km · ${z.toFixed(1)} m</strong><br>${profileMode==='merged'?`${merged.parentId}.${merged.partIndex} ${TYPES[merged.type].name} · 合并子段 ${gradeText(merged.grade)}`:detail}<br>${main}<br>当前位置坡度 ${gradeText(edge.grade)}`;
+ const parent=result.segments[edge.parentId-1],merged=result.mergedProfiles[edge.profileIndex];const main=`${profileMode==='merged'?'':`第 ${parent.id} 段 `}${DIRECTIONS[parent.direction].name} · 整坡 ${gradeText(parent.grade)}`,detail=`${parent.id}.${edge.childIndex} ${TYPES[edge.type].name} · 子段 ${gradeText(edge.segmentGrade)}`;tip.innerHTML=`<strong>${(s/1000).toFixed(3)} km · ${z.toFixed(1)} m</strong><br>${profileMode==='merged'?`${slopeNumber(merged)} ${TYPES[merged.type].name} · 合并子段 ${gradeText(merged.grade)}`:detail}<br>${main}<br>当前位置坡度 ${gradeText(edge.grade)}`;
  tip.style.display='block';tip.style.left=Math.max(4,Math.min(px+14,box.width-tip.offsetWidth-4))+'px';tip.style.top=Math.max(0,Math.min(py-55,box.height-tip.offsetHeight-5))+'px';draw();
 }
 function hideHover(){hover=null;$('tooltip').style.display='none';draw();}

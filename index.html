@@ -18,6 +18,7 @@
 @media(min-width:1100px){#route-stats .stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .profile-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.profile-actions .btn{font-size:12px;padding:6px 10px}#route-stats .stats{margin-top:0}
 .slope-thumbnail{display:inline-block;width:76px;height:38px;vertical-align:middle}.slope-thumbnail svg{display:block;width:76px;height:38px}
+.palette-setting{margin:18px 0;padding:12px;border:1px solid var(--line);border-radius:10px;background:#f8faf7}.palette-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;font-size:12px;font-weight:600;min-height:32px}.palette-toggle input{appearance:none;position:relative;flex:none;width:38px;height:22px;border-radius:20px;background:#87958e;border:0;cursor:pointer;margin:0}.palette-toggle input:before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;border-radius:50%;background:white;transition:transform .15s}.palette-toggle input:checked{background:#0072b2}.palette-toggle input:checked:before{transform:translateX(16px)}.palette-setting .hint{margin-top:6px}
 </style>
 </head>
 <body>
@@ -35,6 +36,7 @@
 <div class="field"><label for="steep">陡坡阈值 <span>绝对坡度达到</span></label><div class="unit-input"><input id="steep" type="number" min="0.2" max="60" step="0.1" value="6"><span>%</span></div></div>
 <div class="field"><label for="smooth">海拔平滑窗口 <span>减少 GPS 噪声</span></label><div class="unit-input"><input id="smooth" type="number" min="0" max="1000" step="10" value="100"><span>m</span></div></div>
 <div class="field"><label for="min-segment">最短坡段长度 <span>用于完整上 / 下坡</span></label><div class="unit-input"><input id="min-segment" type="number" min="0" max="10000" step="10" value="300"><span>m</span></div><p class="hint">短坡并入邻坡；缓陡细节单独保留。设为 0 关闭短坡合并。</p></div>
+<div class="palette-setting"><label class="palette-toggle" for="blue-orange"><span>蓝橙配色</span><input id="blue-orange" type="checkbox" role="switch" aria-describedby="palette-help"></label><p class="hint" id="palette-help">上坡用橙色，下坡用蓝色，缓陡用深浅区分，减少对红绿辨色的依赖。切换即生效。</p></div>
 <p class="hint">坡度 = 海拔变化 ÷ 水平距离 × 100%。阈值可按跑步、骑行或徒步需求调整。</p><button id="apply" class="btn primary">应用参数</button>
 <div class="legend" id="legend"></div>
 <details><summary>计算方法与数据说明</summary><p>以 WGS84 经纬度的球面距离累计里程，每 20 米重采样海拔，再按距离窗口做中心移动平均。使用相邻采样点的平滑海拔差计算坡度。先保留平路、缓上 / 下坡、陡上 / 下坡子段，再把连续同方向子段归为完整坡段。最短坡段长度仅作用于完整坡段，短段优先连接两侧同方向坡段，其次并入坡度接近的邻段。缓坡和陡坡的颜色、长度及各自平均坡度始终独立保留。</p><p>不同 trkseg 分别分析，不连接断开的轨迹。缺失海拔在同一轨迹段内插值，首尾缺失值使用最近有效值；完全没有海拔的轨迹段跳过。累计升降基于平滑海拔，仅供路线分析参考。整条独立轨迹短于最短坡段长度时保留一段，不跨轨迹合并。最短长度设为 0 时，只归组连续同方向坡段，不吸收短反向坡或短平路。</p></details>
@@ -58,6 +60,14 @@ const TYPES = [
  {key:'down',name:'缓下坡',color:'#63ada9'},
  {key:'steepdown',name:'陡下坡',color:'#637fc5'}
 ];
+const DEFAULT_COLORS=TYPES.map(t=>t.color);
+const BLUE_ORANGE_COLORS=['#808080','#E69F00','#A65F00','#56B4E9','#0072B2'];
+function setPalette(enabled){
+ const colors=enabled?BLUE_ORANGE_COLORS:DEFAULT_COLORS;
+ TYPES.forEach((t,i)=>{t.color=colors[i];});
+}
+try{$('blue-orange').checked=localStorage.getItem('popu-blue-orange')==='true';}catch{}
+setPalette($('blue-orange').checked);
 let source=null, result=null, geometry=null, hover=null, loadVersion=0;
 let chartView=null,gesture=null;
 let profileMode='merged';
@@ -362,6 +372,15 @@ function setupChartInteraction(){
 
 function readFileText(file){if(typeof file.text==='function')return file.text();return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('读取失败，请先把 GPX 下载到手机本地再重试。'));reader.onabort=()=>reject(Error('已取消读取文件。'));reader.readAsText(file);});}
 async function loadFile(file){if(!file)return;const version=++loadVersion;status('正在读取并分析 GPX…');try{if(file.size>50*1024*1024)throw Error('文件超过 50 MB，请先拆分轨迹后导入。');const text=await readFileText(file);if(version!==loadVersion)return;const parsed=parseGPX(text,file.name.replace(/\.gpx$/i,''));const p=params(),analyzed=analyze(parsed,p);source=parsed;result=analyzed;chartView=null;clearGesture();$('filename').textContent=file.name;apply();}catch(e){if(version===loadVersion)status(e.message||'读取文件失败，请重试。',true);}finally{$('file').value='';}}
+$('blue-orange').addEventListener('change',()=>{
+ const enabled=$('blue-orange').checked;setPalette(enabled);
+ try{localStorage.setItem('popu-blue-orange',String(enabled));}catch{}
+ if(result){render();}else{
+  $('legend').querySelectorAll('.dot').forEach((dot,i)=>{dot.style.background=TYPES[i].color;});
+  $('distribution').querySelectorAll('.dot').forEach((dot,i)=>{dot.style.background=TYPES[i].color;});
+  draw();
+ }
+});
 $('file').addEventListener('change',e=>loadFile(e.target.files[0]));$('drop').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click();}});for(const name of ['dragenter','dragover'])$('drop').addEventListener(name,e=>{e.preventDefault();$('drop').classList.add('over');});for(const name of ['dragleave','drop'])$('drop').addEventListener(name,e=>{e.preventDefault();$('drop').classList.remove('over');});$('drop').addEventListener('drop',e=>loadFile(e.dataTransfer.files[0]));window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('drop',e=>e.preventDefault());$('apply').addEventListener('click',apply);
 $('demo').addEventListener('click',()=>{try{params();loadVersion++;const knots=[[0,130],[1000,140],[2300,192],[3200,282],[3800,294],[4800,254],[5700,155],[6800,160],[8000,220],[9000,140],[10000,145]],piece=[];for(let s=0;s<=10000;s+=10){let i=0;while(i<knots.length-2&&knots[i+1][0]<s)i++;const a=knots[i],b=knots[i+1],z=a[1]+(b[1]-a[1])*(s-a[0])/(b[0]-a[0]);piece.push({lat:30+s/6371008.8*180/Math.PI,lon:120,z:z+0.3*Math.sin(s/34)});}source=prepare([piece],'山间环线 · 示例');chartView=null;clearGesture();$('filename').textContent='示例路线（模拟数据）';apply();}catch(e){status(e.message,true);}});
 async function exportProfileImage(){

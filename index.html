@@ -12,6 +12,7 @@
 .chart-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}.chart-controls{display:flex;gap:6px}.chart-controls .btn{padding:5px 11px;min-width:36px;min-height:34px;font-size:12px}.view-range{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}#chart{touch-action:none;cursor:grab}#chart.dragging{cursor:grabbing}.chart-footer{flex-wrap:wrap}
 @media(max-width:700px){.wrap{padding:0 16px 24px}header{height:76px}.privacy{font-size:10px}.intro{padding-top:24px;gap:12px}h1{font-size:25px}.intro p{font-size:12px}.intro .btn{font-size:11px;padding:8px;white-space:nowrap}.layout{grid-template-columns:minmax(0,1fr)}.sidebar{padding:18px}.sidebar .divider{margin:18px 0}.legend{grid-template-columns:1fr}.chart-card{padding:18px 12px 14px}.chart-area{height:300px}.stat{padding:15px}.chart-footer{font-size:10px}.table-card{padding:18px 12px}}
 .drop{display:block}.file-input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap;border:0}.sidebar:has(.file-input:focus-visible) .drop{outline:3px solid #86bea7;outline-offset:3px}
+.whole-row{background:#f4f7f1}.child-row td{font-size:11px;color:#627568}.child-row td:first-child{padding-left:23px}.child-count{display:block;font-size:10px;color:var(--muted)}.expand-segment{background:white;border:1px solid #dce5d8;border-radius:6px;padding:5px 8px;color:var(--ink);font-variant-numeric:tabular-nums}.whole-row td{border-top:1px solid #dce5d8}
 </style>
 </head>
 <body>
@@ -28,15 +29,16 @@
 <div class="field"><label for="flat">平路阈值 <span>绝对坡度小于</span></label><div class="unit-input"><input id="flat" type="number" min="0.1" max="30" step="0.1" value="2"><span>%</span></div></div>
 <div class="field"><label for="steep">陡坡阈值 <span>绝对坡度达到</span></label><div class="unit-input"><input id="steep" type="number" min="0.2" max="60" step="0.1" value="6"><span>%</span></div></div>
 <div class="field"><label for="smooth">海拔平滑窗口 <span>减少 GPS 噪声</span></label><div class="unit-input"><input id="smooth" type="number" min="0" max="1000" step="10" value="100"><span>m</span></div></div>
+<div class="field"><label for="min-segment">最短坡段长度 <span>用于完整上 / 下坡</span></label><div class="unit-input"><input id="min-segment" type="number" min="0" max="10000" step="10" value="300"><span>m</span></div><p class="hint">短坡并入邻坡；缓陡细节单独保留。设为 0 关闭短坡合并。</p></div>
 <p class="hint">坡度 = 海拔变化 ÷ 水平距离 × 100%。阈值可按跑步、骑行或徒步需求调整。</p><button id="apply" class="btn primary">应用参数</button>
 <div class="legend" id="legend"></div>
-<details><summary>计算方法与数据说明</summary><p>以 WGS84 经纬度的球面距离累计里程，每 20 米重采样海拔，再按距离窗口做中心移动平均。使用相邻采样点的平滑海拔差计算坡度；不足 100 米的坡段并入坡度更接近的邻段，按合并后的平均坡度重新分类，并继续合并同类连续坡段。</p><p>不同 trkseg 分别分析，不连接断开的轨迹。缺失海拔在同一轨迹段内插值，首尾缺失值使用最近有效值；完全没有海拔的轨迹段跳过。累计升降基于平滑海拔，仅供路线分析参考。整条独立轨迹不足 100 米时保留一段，不跨轨迹合并。</p></details>
+<details><summary>计算方法与数据说明</summary><p>以 WGS84 经纬度的球面距离累计里程，每 20 米重采样海拔，再按距离窗口做中心移动平均。使用相邻采样点的平滑海拔差计算坡度。先保留平路、缓上 / 下坡、陡上 / 下坡子段，再把连续同方向子段归为完整坡段。最短坡段长度仅作用于完整坡段，短段优先连接两侧同方向坡段，其次并入坡度接近的邻段。缓坡和陡坡的颜色、长度及各自平均坡度始终独立保留。</p><p>不同 trkseg 分别分析，不连接断开的轨迹。缺失海拔在同一轨迹段内插值，首尾缺失值使用最近有效值；完全没有海拔的轨迹段跳过。累计升降基于平滑海拔，仅供路线分析参考。整条独立轨迹短于最短坡段长度时保留一段，不跨轨迹合并。最短长度设为 0 时，只归组连续同方向坡段，不吸收短反向坡或短平路。</p></details>
 </aside>
 <main class="main">
 <div class="stats"><div class="card stat"><label>总距离</label><div class="value" id="distance">—<small>km</small></div><div class="sub">沿轨迹累计水平距离</div></div><div class="card stat"><label>累计爬升</label><div class="value" id="ascent">—<small>m</small></div><div class="sub">基于平滑后的海拔</div></div><div class="card stat"><label>累计下降</label><div class="value" id="descent">—<small>m</small></div><div class="sub">基于平滑后的海拔</div></div><div class="card stat"><label>海拔范围</label><div class="value" id="range" style="font-size:21px">—<small>m</small></div><div class="sub">分析轨迹的原始海拔</div></div></div>
-<section class="card chart-card"><div class="card-title"><h2>海拔剖面</h2><span class="tag" id="chart-tag">等待导入</span></div><div class="chart-toolbar"><span class="view-range" id="view-range" aria-live="polite">全程视图</span><div class="chart-controls" role="group" aria-label="剖面图缩放"><button class="btn" id="zoom-in" aria-label="放大剖面图" title="放大（+）" disabled>＋</button><button class="btn" id="zoom-out" aria-label="缩小剖面图" title="缩小（−）" disabled>−</button><button class="btn" id="zoom-reset" title="恢复全程（0 / 双击）" disabled>恢复全程</button></div></div><div class="chart-area" id="chart-area"><canvas id="chart" role="img" tabindex="0" aria-label="海拔剖面图；滚轮或加减键缩放，拖动或左右键平移，按 0 恢复全程；下方表格提供坡段详情"></canvas><div class="chart-empty" id="empty"><strong>一条路线，一幅地形画像</strong><span>选择 GPX 文件，或先体验示例路线</span></div><div id="tooltip" class="tooltip"></div></div><div class="chart-footer"><span>横轴：距离 / km　纵轴：海拔 / m</span><span>滚轮 / 双指缩放 · 拖动平移 · 双击恢复</span></div></section>
-<div class="bottom"><section class="card distribution"><div class="card-title"><h2>坡段构成</h2><span class="count">按距离占比</span></div><div class="stack" id="stack"></div><div id="distribution"></div></section><section class="card details"><h2>路线概况</h2><div class="route-meta"><div><span>路线名称</span><strong id="route-name">—</strong></div><div><span>有效原始轨迹点</span><strong id="point-count">—</strong></div><div><span>独立轨迹段</span><strong id="track-count">—</strong></div><div><span>划分坡段</span><strong id="segment-count">—</strong></div><div><span>分析后的最大上 / 下坡度</span><strong id="max-grade">—</strong></div></div><div class="note">不足 100 m 的坡段自动并入相邻坡段，颜色按整段平均坡度标注。平滑窗口设为 0 可关闭平滑；短于 100 m 的独立轨迹保留一段。</div></section></div>
-<section class="card table-card"><div class="card-title"><h2>坡段明细 <span class="count" id="table-count"></span></h2><button id="export" class="btn" disabled>导出 CSV ↓</button></div><div class="table-wrap"><table><thead><tr><th>坡段</th><th>类型</th><th>起止里程 / km</th><th>长度 / m</th><th>平均坡度</th><th>海拔变化 / m</th></tr></thead><tbody id="rows"><tr><td class="empty-row" colspan="6">导入后查看各坡段的距离与坡度</td></tr></tbody></table></div></section>
+<section class="card chart-card"><div class="card-title"><h2>海拔剖面</h2><span class="tag" id="chart-tag">等待导入</span></div><div class="chart-toolbar"><span class="view-range" id="view-range" aria-live="polite">全程视图</span><div class="chart-controls" role="group" aria-label="剖面图缩放"><button class="btn" id="zoom-in" aria-label="放大剖面图" title="放大（+）" disabled>＋</button><button class="btn" id="zoom-out" aria-label="缩小剖面图" title="缩小（−）" disabled>−</button><button class="btn" id="zoom-reset" title="恢复全程（0 / 双击）" disabled>恢复全程</button></div></div><div class="chart-area" id="chart-area"><canvas id="chart" role="img" tabindex="0" aria-label="海拔剖面图；滚轮或加减键缩放，拖动或左右键平移，按 0 恢复全程；下方表格提供坡段详情"></canvas><div class="chart-empty" id="empty"><strong>一条路线，一幅地形画像</strong><span>选择 GPX 文件，或先体验示例路线</span></div><div id="tooltip" class="tooltip"></div></div><p class="hint" style="margin:4px 0 10px">顶部细条：完整上坡 ↑ / 下坡 ↓ / 平路 —；曲线颜色：内部缓陡变化。</p><div class="chart-footer"><span>横轴：距离 / km　纵轴：海拔 / m</span><span>滚轮 / 双指缩放 · 拖动平移 · 双击恢复</span></div></section>
+<div class="bottom"><section class="card distribution"><div class="card-title"><h2>坡段构成</h2><span class="count">按距离占比</span></div><div class="stack" id="stack"></div><div id="distribution"></div></section><section class="card details"><h2>路线概况</h2><div class="route-meta"><div><span>路线名称</span><strong id="route-name">—</strong></div><div><span>有效原始轨迹点</span><strong id="point-count">—</strong></div><div><span>独立轨迹段</span><strong id="track-count">—</strong></div><div><span>完整坡段 / 子段</span><strong id="segment-count">—</strong></div><div><span>分析后的最大上 / 下坡度</span><strong id="max-grade">—</strong></div></div><div class="note">最短长度用于完整上 / 下坡，不限制内部缓陡子段。整坡平均坡度仅作概要；曲线颜色、缓陡占比和展开明细保留各子段原本的坡度。独立短轨迹会保留。</div></section></div>
+<section class="card table-card"><div class="card-title"><h2>坡段明细 <span class="count" id="table-count"></span></h2><button id="export" class="btn" disabled>导出 CSV ↓</button></div><p class="hint" style="margin:0 0 12px">点击坡段编号展开缓坡、陡坡等子段；整坡平均与子段平均分别显示，内部细节可短于最短坡段长度。</p><div class="table-wrap"><table><thead><tr><th>坡段</th><th>类型</th><th>起止里程 / km</th><th>长度 / m</th><th>平均坡度 / 层级</th><th>海拔变化 / m</th></tr></thead><tbody id="rows"><tr><td class="empty-row" colspan="6">导入后查看各坡段的距离与坡度</td></tr></tbody></table></div></section>
 </main></div><footer>坡谱 · 让每一段起伏都有迹可循</footer>
 </div>
 <script>
@@ -53,7 +55,7 @@ let source=null, result=null, geometry=null, hover=null, loadVersion=0;
 let chartView=null,gesture=null;
 const chartPointers=new Map();
 function status(message,error=false){$('status').hidden=!message;$('status').textContent=message;$('status').className=error?'error':'';}
-function params(){const p={flat:Number($('flat').value),steep:Number($('steep').value),smooth:Number($('smooth').value)};if(!Number.isFinite(p.flat)||p.flat<=0||p.flat>30||!Number.isFinite(p.steep)||p.steep<=p.flat||p.steep>60||!Number.isFinite(p.smooth)||p.smooth<0||p.smooth>1000)throw Error('请检查参数：平路阈值须大于 0 且不超过 30%，陡坡阈值须大于平路阈值且不超过 60%，平滑窗口须在 0–1000 m 之间。');return p;}
+function params(){const p={flat:Number($('flat').value),steep:Number($('steep').value),smooth:Number($('smooth').value),minSegment:Number($('min-segment').value)};if(!Number.isFinite(p.flat)||p.flat<=0||p.flat>30||!Number.isFinite(p.steep)||p.steep<=p.flat||p.steep>60||!Number.isFinite(p.smooth)||p.smooth<0||p.smooth>1000)throw Error('请检查参数：平路阈值须大于 0 且不超过 30%，陡坡阈值须大于平路阈值且不超过 60%，平滑窗口须在 0–1000 m 之间。');if($('min-segment').value.trim()===''||!Number.isFinite(p.minSegment)||p.minSegment<0||p.minSegment>10000)throw Error('最短坡段长度须在 0–10000 m 之间，0 表示关闭短坡合并。');return p;}
 function classify(grade,p){if(Math.abs(grade)<p.flat)return 0;if(grade>=p.steep)return 2;if(grade>=p.flat)return 1;if(grade<=-p.steep)return 4;return 3;}
 function haversine(a,b){const rad=Math.PI/180,dlat=(b.lat-a.lat)*rad,dlon=(b.lon-a.lon)*rad;const h=Math.sin(dlat/2)**2+Math.cos(a.lat*rad)*Math.cos(b.lat*rad)*Math.sin(dlon/2)**2;return 6371008.8*2*Math.atan2(Math.sqrt(h),Math.sqrt(Math.max(0,1-h)));}
 function children(node,name){return Array.from(node.children).filter(n=>n.localName===name);}
@@ -67,39 +69,110 @@ function prepare(pieces,name,invalid=0){const tracks=[];let missing=0,skipped=0,
 }
 function interpolate(pts,s,cursor){while(cursor.i<pts.length-2&&pts[cursor.i+1].s<s)cursor.i++;const a=pts[cursor.i],b=pts[cursor.i+1];return a.z+(b.z-a.z)*(s-a.s)/(b.s-a.s);}
 function smoothPoints(pts,window){if(!window)return pts.map(p=>({...p}));const prefix=[0];for(let i=1;i<pts.length;i++)prefix[i]=prefix[i-1]+(pts[i].z+pts[i-1].z)/2*(pts[i].s-pts[i-1].s);const primitive=(s,c)=>{while(c.i<pts.length-2&&pts[c.i+1].s<s)c.i++;const a=pts[c.i],b=pts[c.i+1],d=s-a.s,z=a.z+(b.z-a.z)*d/(b.s-a.s);return prefix[c.i]+(a.z+z)/2*d;};const left={i:0},right={i:0},end=pts.at(-1).s;return pts.map(p=>{const a=Math.max(0,p.s-window/2),b=Math.min(end,p.s+window/2);return {...p,z:(primitive(b,right)-primitive(a,left))/(b-a)};});}
-const MIN_SEGMENT_LENGTH=100;
-function updateSegment(seg,p){seg.length=seg.end-seg.start;seg.change=seg.z1-seg.z0;seg.grade=seg.change/seg.length*100;seg.type=classify(seg.grade,p);return seg;}
-// Each input list belongs to one continuous track. Never merge across a GPX gap.
+const DEFAULT_MIN_SEGMENT_LENGTH=300;
+const DIRECTIONS={up:{name:'上坡',symbol:'↑',color:'#518869'},down:{name:'下坡',symbol:'↓',color:'#6484b3'},flat:{name:'平路',symbol:'—',color:'#91a39b'}};
+function segmentMinimum(p){return p.minSegment??DEFAULT_MIN_SEGMENT_LENGTH;}
+function directionOf(type){return type===0?'flat':type<=2?'up':'down';}
+function updateSegment(seg,p){seg.length=seg.end-seg.start;seg.change=seg.z1-seg.z0;seg.grade=seg.change/seg.length*100;seg.type=classify(seg.grade,p);seg.direction=directionOf(seg.type);return seg;}
+// Merge whole climbs/descents only. Preserve every original gentle/steep child.
 function mergeShortSegments(input,p){
- const groups=input.map(s=>updateSegment({...s},p));
- const join=(i)=>{const a=groups[i],b=groups[i+1];a.end=b.end;a.z1=b.z1;updateSegment(a,p);groups.splice(i+1,1);};
- let i=0;
+ const groups=[];
+ for(const part of input){
+  const child=updateSegment({...part},p),last=groups.at(-1);child.type=part.type;child.direction=directionOf(part.type);
+  if(last&&last.track===child.track&&last.direction===child.direction){last.end=child.end;last.z1=child.z1;last.children.push(child);const direction=last.direction;updateSegment(last,p);last.direction=direction;}
+  else{const group=updateSegment({...child,children:[child]},p);group.direction=child.direction;groups.push(group);}
+ }
+ const join=i=>{const a=groups[i],b=groups[i+1];a.end=b.end;a.z1=b.z1;a.children.push(...b.children);updateSegment(a,p);groups.splice(i+1,1);};
+ let i=0;const minimum=segmentMinimum(p);
  while(i<groups.length){
-  if(i>0&&groups[i-1].type===groups[i].type){join(i-1);i=Math.max(0,i-2);continue;}
-  if(groups[i].length<MIN_SEGMENT_LENGTH-1e-6&&groups.length>1){
-   let neighbor;
-   if(i===0)neighbor=1;
-   else if(i===groups.length-1)neighbor=i-1;
-   else{
-    const left=groups[i-1],right=groups[i+1],grade=groups[i].grade;
-    const dl=Math.abs(grade-left.grade),dr=Math.abs(grade-right.grade);
-    neighbor=dl<dr||(Math.abs(dl-dr)<1e-9&&left.length>=right.length)?i-1:i+1;
+  const current=groups[i],left=groups[i-1],right=groups[i+1];
+  if(left&&left.track===current.track&&left.direction===current.direction){join(i-1);i=Math.max(0,i-2);continue;}
+  if(current.length<minimum-1e-6){
+   const hasLeft=!!left&&left.track===current.track,hasRight=!!right&&right.track===current.track;
+   if(hasLeft&&hasRight&&left.direction===right.direction){join(i);join(i-1);i=Math.max(0,i-2);continue;}
+   if(hasLeft||hasRight){
+    let neighbor;
+    if(!hasLeft)neighbor=i+1;
+    else if(!hasRight)neighbor=i-1;
+    else{const dl=Math.abs(current.grade-left.grade),dr=Math.abs(current.grade-right.grade);neighbor=dl<dr||(Math.abs(dl-dr)<1e-9&&left.length>=right.length)?i-1:i+1;}
+    const start=Math.min(i,neighbor);join(start);i=Math.max(0,start-1);continue;
    }
-   const start=Math.min(i,neighbor);join(start);i=Math.max(0,start-1);continue;
   }
   i++;
  }
  return groups;
 }
-function analyze(src,p){const edges=[],segments=[],drawTracks=[],totals=TYPES.map(()=>0);let offset=0,ascent=0,descent=0,min=Infinity,max=-Infinity,maxUp=0,maxDown=0,rawSegmentCount=0,shortTracks=0;for(let ti=0;ti<src.tracks.length;ti++){const raw=src.tracks[ti],length=raw.at(-1).s;for(const point of raw){min=Math.min(min,point.z);max=Math.max(max,point.z);}const samples=[],cursor={i:0};for(let s=0;s<length;s+=20)samples.push({s,z:interpolate(raw,s,cursor)});samples.push({s:length,z:raw.at(-1).z});const points=smoothPoints(samples,p.smooth);drawTracks.push(points.map(q=>({...q,s:q.s+offset})));let current=null;const trackSegments=[],trackEdges=[];for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],distance=b.s-a.s,dz=b.z-a.z,grade=dz/distance*100,type=classify(grade,p);ascent+=Math.max(0,dz);descent+=Math.max(0,-dz);maxUp=Math.max(maxUp,grade);maxDown=Math.min(maxDown,grade);const edge={start:a.s+offset,end:b.s+offset,z0:a.z,z1:b.z,grade,type,track:ti};trackEdges.push(edge);if(current&&current.type===type){current.end=edge.end;current.z1=b.z;}else{current={...edge};trackSegments.push(current);}}
- rawSegmentCount+=trackSegments.length;const merged=mergeShortSegments(trackSegments,p);if(length<MIN_SEGMENT_LENGTH-1e-6)shortTracks++;for(const seg of merged){segments.push(seg);totals[seg.type]+=seg.length;}let group=0;for(const edge of trackEdges){while(group<merged.length-1&&edge.start>=merged[group].end-1e-6)group++;edge.type=merged[group].type;edge.segmentGrade=merged[group].grade;edges.push(edge);}offset+=length;}
- return {edges,segments,drawTracks,totals,distance:offset,ascent,descent,min,max,maxUp,maxDown,rawSegmentCount,shortTracks,p};}
+function analyze(src,p){
+ const edges=[],segments=[],drawTracks=[],totals=TYPES.map(()=>0);
+ let offset=0,ascent=0,descent=0,min=Infinity,max=-Infinity,maxUp=0,maxDown=0,rawSegmentCount=0,shortTracks=0;
+ for(let ti=0;ti<src.tracks.length;ti++){
+  const raw=src.tracks[ti],length=raw.at(-1).s;
+  for(const point of raw){min=Math.min(min,point.z);max=Math.max(max,point.z);}
+  const samples=[],cursor={i:0};for(let s=0;s<length-1e-6;s+=20)samples.push({s,z:interpolate(raw,s,cursor)});
+  samples.push({s:length,z:raw.at(-1).z});const points=smoothPoints(samples,p.smooth);
+  drawTracks.push(points.map(q=>({...q,s:q.s+offset})));
+  let current=null;const parts=[],trackEdges=[];
+  for(let i=1;i<points.length;i++){
+   const a=points[i-1],b=points[i],distance=b.s-a.s,dz=b.z-a.z,grade=dz/distance*100,type=classify(grade,p);
+   ascent+=Math.max(0,dz);descent+=Math.max(0,-dz);maxUp=Math.max(maxUp,grade);maxDown=Math.min(maxDown,grade);totals[type]+=distance;
+   const edge={start:a.s+offset,end:b.s+offset,z0:a.z,z1:b.z,grade,type,track:ti};trackEdges.push(edge);
+   if(current&&current.type===type){current.end=edge.end;current.z1=b.z;}else{current={...edge};parts.push(current);}
+  }
+  rawSegmentCount+=parts.length;
+  const merged=mergeShortSegments(parts,p);
+  if(length<segmentMinimum(p)-1e-6)shortTracks++;
+  for(const seg of merged){seg.id=segments.length+1;segments.push(seg);}
+  let group=0,child=0;
+  for(const edge of trackEdges){
+   while(group<merged.length-1&&edge.start>=merged[group].end-1e-6){group++;child=0;}
+   const parent=merged[group];while(child<parent.children.length-1&&edge.start>=parent.children[child].end-1e-6)child++;
+   edge.parentId=parent.id;edge.segmentGrade=parent.children[child].grade;edges.push(edge);
+  }
+  offset+=length;
+ }
+ return {edges,segments,drawTracks,totals,distance:offset,ascent,descent,min,max,maxUp,maxDown,rawSegmentCount,shortTracks,p};
+}
+
 function legend(p){const ranges=[`|坡度| < ${p.flat}%`,`${p.flat}% 至 < ${p.steep}%`,`≥ ${p.steep}%`,`−${p.steep}% 至 −${p.flat}%`,`≤ −${p.steep}%`];$('legend').innerHTML=TYPES.map((t,i)=>`<div class="legend-row"><span><i class="dot" style="background:${t.color}"></i>${t.name}</span><small>${ranges[i]}</small></div>`).join('');}
-function render(){const r=result;legend(r?r.p:params());$('distribution').innerHTML=TYPES.map((t,i)=>`<div class="dist-row"><span><i class="dot" style="background:${t.color}"></i>${t.name}</span><span>${r?(r.totals[i]/1000).toFixed(2):'—'} km</span><span>${r?(r.totals[i]/r.distance*100).toFixed(1):'—'}%</span></div>`).join('');if(!r){draw();return;}
+function gradeText(g){return `${g>0?'+':''}${g.toFixed(2)}%`;}
+function renderSegmentRows(r){
+ return r.segments.map(s=>{
+  const d=DIRECTIONS[s.direction];
+  const parent=`<tr class="whole-row"><td><button class="expand-segment" data-segment="${s.id}" aria-expanded="false" aria-label="展开第 ${s.id} 坡段的缓陡细节">▸ ${String(s.id).padStart(2,'0')}</button></td><td><span style="color:${d.color}">${d.symbol} ${d.name}</span><small class="child-count">${s.children.length} 个子段</small></td><td>${(s.start/1000).toFixed(3)} – ${(s.end/1000).toFixed(3)}</td><td>${s.length.toFixed(1)}</td><td>${gradeText(s.grade)}<small class="child-count">整坡平均</small></td><td>${s.change>0?'+':''}${s.change.toFixed(1)}</td></tr>`;
+  const children=s.children.map((c,j)=>`<tr class="child-row" data-parent="${s.id}" hidden><td>${s.id}.${j+1}</td><td><span><i class="dot" style="background:${TYPES[c.type].color}"></i>${TYPES[c.type].name}</span></td><td>${(c.start/1000).toFixed(3)} – ${(c.end/1000).toFixed(3)}</td><td>${c.length.toFixed(1)}</td><td>${gradeText(c.grade)}<small class="child-count">子段平均</small></td><td>${c.change>0?'+':''}${c.change.toFixed(1)}</td></tr>`).join('');
+  return parent+children;
+ }).join('');
+}
+function render(){
+ const r=result;legend(r?r.p:params());
+ $('distribution').innerHTML=TYPES.map((t,i)=>`<div class="dist-row"><span><i class="dot" style="background:${t.color}"></i>${t.name}</span><span>${r?(r.totals[i]/1000).toFixed(2):'—'} km</span><span>${r?(r.totals[i]/r.distance*100).toFixed(1):'—'}%</span></div>`).join('');
+ if(!r){draw();return;}
  for(const [id,val,unit] of [['distance',(r.distance/1000).toFixed(2),'km'],['ascent',r.ascent.toFixed(0),'m'],['descent',r.descent.toFixed(0),'m'],['range',`${r.min.toFixed(0)}–${r.max.toFixed(0)}`,'m']])$(id).innerHTML=`${val}<small>${unit}</small>`;
- $('stack').innerHTML=TYPES.map((t,i)=>`<div style="width:${r.totals[i]/r.distance*100}%;background:${t.color}" title="${t.name} ${(r.totals[i]/r.distance*100).toFixed(1)}%"></div>`).join('');$('route-name').textContent=source.name;$('point-count').textContent=source.tracks.reduce((n,t)=>n+t.length,0).toLocaleString();$('track-count').textContent=source.tracks.length;$('segment-count').textContent=r.segments.length;$('max-grade').textContent=`+${r.maxUp.toFixed(1)}% / ${r.maxDown.toFixed(1)}%`;$('table-count').textContent=`· ${r.segments.length} 段（合并前 ${r.rawSegmentCount} 段）`;$('chart-tag').textContent=`100 m 短坡合并 · ${r.p.smooth} m 平滑`;$('empty').hidden=true;$('export').disabled=false;
- $('rows').innerHTML=r.segments.map((s,i)=>`<tr><td>${String(i+1).padStart(2,'0')}</td><td><span><i class="dot" style="background:${TYPES[s.type].color}"></i>${TYPES[s.type].name}</span></td><td>${(s.start/1000).toFixed(3)} – ${(s.end/1000).toFixed(3)}</td><td>${s.length.toFixed(1)}</td><td>${s.grade>0?'+':''}${s.grade.toFixed(2)}%</td><td>${s.change>0?'+':''}${s.change.toFixed(1)}</td></tr>`).join('');hover=null;$('tooltip').style.display='none';draw();}
-function apply(){try{const p=params();if(source)result=analyze(source,p);render();const notices=[];if(result?.shortTracks)notices.push(`${result.shortTracks} 条独立轨迹不足 100 m，已各保留一段，避免跨轨迹合并`);if(source?.missing)notices.push(`${source.missing} 个缺失海拔点已补齐`);if(source?.skipped)notices.push(`${source.skipped} 个无法分析的轨迹段已跳过`);if(source?.invalid)notices.push(`${source.invalid} 个无效坐标点已移除，并在此处断开轨迹`);if(source?.duplicates)notices.push(`${source.duplicates} 个重复位置点已合并`);status(notices.length?notices.join('；')+'。':'');}catch(e){status(e.message,true);}}
+ $('stack').innerHTML=TYPES.map((t,i)=>`<div style="width:${r.totals[i]/r.distance*100}%;background:${t.color}" title="${t.name} ${(r.totals[i]/r.distance*100).toFixed(1)}%"></div>`).join('');
+ $('route-name').textContent=source.name;$('point-count').textContent=source.tracks.reduce((n,t)=>n+t.length,0).toLocaleString();$('track-count').textContent=source.tracks.length;
+ $('segment-count').textContent=`${r.segments.length} 个完整坡段 · ${r.rawSegmentCount} 个缓陡子段`;
+ $('max-grade').textContent=`+${r.maxUp.toFixed(1)}% / ${r.maxDown.toFixed(1)}%`;
+ $('table-count').textContent=`· ${r.segments.length} 个完整坡段`;
+ $('chart-tag').textContent=`最短 ${segmentMinimum(r.p)} m · ${r.p.smooth} m 平滑`;
+ $('empty').hidden=true;$('export').disabled=false;
+ $('rows').innerHTML=renderSegmentRows(r);hover=null;$('tooltip').style.display='none';draw();
+}
+function apply(){try{
+ const p=params();if(source)result=analyze(source,p);render();const notices=[];
+ if(result?.shortTracks)notices.push(`${result.shortTracks} 条独立轨迹不足 ${segmentMinimum(p)} m，已各保留一段，避免跨轨迹合并`);
+ if(source?.missing)notices.push(`${source.missing} 个缺失海拔点已补齐`);
+ if(source?.skipped)notices.push(`${source.skipped} 个无法分析的轨迹段已跳过`);
+ if(source?.invalid)notices.push(`${source.invalid} 个无效坐标点已移除，并在此处断开轨迹`);
+ if(source?.duplicates)notices.push(`${source.duplicates} 个重复位置点已合并`);
+ status(notices.length?notices.join('；')+'。':'');
+}catch(e){status(e.message,true);}}
+function segmentCsv(r){
+ const header=['层级','完整坡段ID','子段序号','轨迹段','类型','起点_km','终点_km','长度_m','整坡平均坡度_%','子段平均坡度_%','起点海拔_m','终点海拔_m','海拔变化_m'];
+ const record=(s,parentId,childIndex)=>[childIndex?'子段':'完整坡段',parentId,childIndex||'',s.track+1,childIndex?TYPES[s.type].name:DIRECTIONS[s.direction].name,(s.start/1000).toFixed(4),(s.end/1000).toFixed(4),s.length.toFixed(2),childIndex?'':s.grade.toFixed(3),childIndex?s.grade.toFixed(3):'',s.z0.toFixed(2),s.z1.toFixed(2),s.change.toFixed(2)];
+ const rows=[header];for(const s of r.segments){rows.push(record(s,s.id,0));s.children.forEach((c,i)=>rows.push(record(c,s.id,i+1)));}
+ return rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+}
+
 function niceStep(range,count){const rough=range/count,base=10**Math.floor(Math.log10(rough)),n=rough/base;return (n<=1?1:n<=2?2:n<=5?5:10)*base;}
 function minimumViewSpan(){return Math.min(result.distance,Math.max(100,result.distance/1000));}
 function chartBounds(){return chartView||{start:0,end:result?result.distance:10000};}
@@ -146,6 +219,12 @@ function draw(){
  for(let km=Math.ceil((view.start/1000-1e-10)/xStep)*xStep;km<=view.end/1000+1e-9;km+=xStep){c.fillStyle='#8a958b';c.textAlign='center';c.fillText(km.toFixed(Math.min(4,digits)),x(km*1000),h-13);}
  c.textAlign='left';c.fillStyle='#8a958b';c.fillText('m',7,15);c.textAlign='right';c.fillText('km',w-2,h-13);
  if(!result)return;
+ for(const seg of result.segments){
+  if(seg.end<=view.start||seg.start>=view.end)continue;
+  const a=x(Math.max(seg.start,view.start)),b=x(Math.min(seg.end,view.end)),d=DIRECTIONS[seg.direction];
+  c.fillStyle=d.color;c.globalAlpha=.7;c.fillRect(a,17,Math.max(0,b-a-1),4);c.globalAlpha=1;
+  if(b-a>65){c.textAlign='center';c.font='10px -apple-system, sans-serif';c.fillText(`${d.symbol} ${d.name} ${seg.id}`,(a+b)/2,11);}
+ }
  // Clip both the filled profile and stroke to the current plot rectangle.
  c.save();c.beginPath();c.rect(pad.left,pad.top,pw,ph);c.clip();
  for(const edge of visible){const xx0=x(edge.start),xx1=x(edge.end),yy0=y(edge.z0),yy1=y(edge.z1);c.globalAlpha=.20;c.fillStyle=TYPES[edge.type].color;c.beginPath();c.moveTo(xx0,h-pad.bottom);c.lineTo(xx0,yy0);c.lineTo(xx1,yy1);c.lineTo(xx1,h-pad.bottom);c.closePath();c.fill();c.globalAlpha=1;c.strokeStyle=TYPES[edge.type].color;c.lineWidth=2.6;c.beginPath();c.moveTo(xx0,yy0);c.lineTo(xx1,yy1);c.stroke();}
@@ -158,7 +237,7 @@ function showHover(event){
  if(px<pad.left||px>pad.left+pw||py<pad.top||py>pad.top+ph){hideHover();return;}
  const s=Math.max(start,Math.min(end,start+(px-pad.left)/pw*(end-start))),edge=result.edges[firstEdgeAt(s)],z=edgeElevation(edge,s);
  hover={s,z,edge};const tip=$('tooltip');
- tip.innerHTML=`<strong>${(s/1000).toFixed(3)} km · ${z.toFixed(1)} m</strong><br>${TYPES[edge.type].name} · 整段 ${edge.segmentGrade>0?'+':''}${edge.segmentGrade.toFixed(2)}%<br>当前位置坡度 ${edge.grade>0?'+':''}${edge.grade.toFixed(2)}%`;
+ const parent=result.segments[edge.parentId-1];tip.innerHTML=`<strong>${(s/1000).toFixed(3)} km · ${z.toFixed(1)} m</strong><br>第 ${parent.id} 段 ${DIRECTIONS[parent.direction].name} · 整坡 ${gradeText(parent.grade)}<br>${TYPES[edge.type].name} · 子段 ${gradeText(edge.segmentGrade)}<br>当前位置坡度 ${gradeText(edge.grade)}`;
  tip.style.display='block';tip.style.left=Math.max(4,Math.min(px+14,box.width-tip.offsetWidth-4))+'px';tip.style.top=Math.max(0,Math.min(py-55,box.height-tip.offsetHeight-5))+'px';draw();
 }
 function hideHover(){hover=null;$('tooltip').style.display='none';draw();}
@@ -221,9 +300,10 @@ function setupChartInteraction(){
 
 function readFileText(file){if(typeof file.text==='function')return file.text();return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('读取失败，请先把 GPX 下载到手机本地再重试。'));reader.onabort=()=>reject(Error('已取消读取文件。'));reader.readAsText(file);});}
 async function loadFile(file){if(!file)return;const version=++loadVersion;status('正在读取并分析 GPX…');try{if(file.size>50*1024*1024)throw Error('文件超过 50 MB，请先拆分轨迹后导入。');const text=await readFileText(file);if(version!==loadVersion)return;const parsed=parseGPX(text,file.name.replace(/\.gpx$/i,''));const p=params(),analyzed=analyze(parsed,p);source=parsed;result=analyzed;chartView=null;clearGesture();$('filename').textContent=file.name;apply();}catch(e){if(version===loadVersion)status(e.message||'读取文件失败，请重试。',true);}finally{$('file').value='';}}
+$('rows').addEventListener('click',e=>{const button=e.target.closest('.expand-segment');if(!button)return;const id=Number(button.dataset.segment),open=button.getAttribute('aria-expanded')!=='true';button.setAttribute('aria-expanded',String(open));button.setAttribute('aria-label',`${open?'收起':'展开'}第 ${id} 坡段的缓陡细节`);button.textContent=`${open?'▾':'▸'} ${String(id).padStart(2,'0')}`;$('rows').querySelectorAll(`[data-parent="${id}"]`).forEach(row=>row.hidden=!open);});
 $('file').addEventListener('change',e=>loadFile(e.target.files[0]));$('drop').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click();}});for(const name of ['dragenter','dragover'])$('drop').addEventListener(name,e=>{e.preventDefault();$('drop').classList.add('over');});for(const name of ['dragleave','drop'])$('drop').addEventListener(name,e=>{e.preventDefault();$('drop').classList.remove('over');});$('drop').addEventListener('drop',e=>loadFile(e.dataTransfer.files[0]));window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('drop',e=>e.preventDefault());$('apply').addEventListener('click',apply);
 $('demo').addEventListener('click',()=>{try{params();loadVersion++;const knots=[[0,130],[1000,140],[2300,192],[3200,282],[3800,294],[4800,254],[5700,155],[6800,160],[8000,220],[9000,140],[10000,145]],piece=[];for(let s=0;s<=10000;s+=10){let i=0;while(i<knots.length-2&&knots[i+1][0]<s)i++;const a=knots[i],b=knots[i+1],z=a[1]+(b[1]-a[1])*(s-a[0])/(b[0]-a[0]);piece.push({lat:30+s/6371008.8*180/Math.PI,lon:120,z:z+0.3*Math.sin(s/34)});}source=prepare([piece],'山间环线 · 示例');chartView=null;clearGesture();$('filename').textContent='示例路线（模拟数据）';apply();}catch(e){status(e.message,true);}});
-$('export').addEventListener('click',()=>{if(!result)return;const csv=[['坡段','轨迹段','类型','起点_km','终点_km','长度_m','平均坡度_%','起点海拔_m','终点海拔_m','海拔变化_m'],...result.segments.map((s,i)=>[i+1,s.track+1,TYPES[s.type].name,(s.start/1000).toFixed(4),(s.end/1000).toFixed(4),s.length.toFixed(2),s.grade.toFixed(3),s.z0.toFixed(2),s.z1.toFixed(2),s.change.toFixed(2)])].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=source.name.replace(/[\\/:*?"<>|]/g,'_')+'_坡段分析.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+$('export').addEventListener('click',()=>{if(!result)return;const csv=segmentCsv(result);const url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=source.name.replace(/[\\/:*?"<>|]/g,'_')+'_坡段分析.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 setupChartInteraction();new ResizeObserver(()=>draw()).observe($('chart-area'));render();
 </script>
 </body>

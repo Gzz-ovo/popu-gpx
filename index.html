@@ -17,7 +17,7 @@
 .bottom{align-items:start}.details .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.details .stat{min-width:0;padding:12px;background:#f6f8f3;border-radius:10px}.details .stat .value{font-size:22px;margin:3px 0}.details .stat .sub{line-height:1.5}
 @media(min-width:1100px){#route-stats .stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .profile-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.profile-actions .btn{font-size:12px;padding:6px 10px}#route-stats .stats{margin-top:0}
-.slope-arrow{display:inline-flex;align-items:center;justify-content:center;width:40px;height:36px;vertical-align:middle}.slope-arrow svg{display:block;width:36px;height:36px;overflow:visible}.slope-type-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0 0 12px;color:var(--muted);font-size:11px}.slope-type-legend>span{display:inline-flex;align-items:center;gap:3px}.slope-type-legend .slope-arrow{width:27px;height:27px}.slope-type-legend svg{width:27px;height:27px}
+.slope-thumbnail{display:inline-block;width:76px;height:38px;vertical-align:middle}.slope-thumbnail svg{display:block;width:76px;height:38px}
 </style>
 </head>
 <body>
@@ -44,7 +44,7 @@
 
 <section class="card chart-card" id="profile-panel"><div class="card-title"><h2>海拔剖面</h2><div class="profile-actions"><span class="tag" id="chart-tag">等待导入</span><button class="btn" id="export-image" type="button" title="导出当前范围与展示模式的 PNG 图片" disabled>导出图片 ↓</button></div></div><div class="profile-switch" role="group" aria-label="坡段展示方式"><button id="view-merged" type="button" aria-pressed="true">合并坡段</button><button id="view-detailed" type="button" aria-pressed="false">详细坡段</button></div><div class="chart-toolbar"><span class="view-range" id="view-range" aria-live="polite">全程视图</span><div class="chart-controls" role="group" aria-label="剖面图缩放"><button class="btn" id="zoom-in" aria-label="放大剖面图" title="放大（+）" disabled>＋</button><button class="btn" id="zoom-out" aria-label="缩小剖面图" title="缩小（−）" disabled>−</button><button class="btn" id="zoom-reset" title="恢复全程（0 / 双击）" disabled>恢复全程</button></div></div><div class="chart-area" id="chart-area"><canvas id="chart" role="img" tabindex="0" aria-label="海拔剖面图；滚轮或加减键缩放，拖动或左右键平移，按 0 恢复全程；下方表格提供坡段详情"></canvas><div class="chart-empty" id="empty"><strong>一条路线，一幅地形画像</strong><span>选择 GPX 文件，或先体验示例路线</span></div><div id="tooltip" class="tooltip"></div></div><div class="profile-legend" id="profile-legend" aria-label="当前图表颜色图例"></div><p class="hint" id="profile-hint" style="margin:4px 0 10px"></p><div class="chart-footer"><span>横轴：距离 / km　纵轴：海拔 / m</span><span>滚轮 / 双指缩放 · 拖动平移 · 双击恢复</span></div></section>
 
-<section class="card table-card" id="slope-details"><div class="card-title"><h2>坡段明细 <span class="count" id="table-count"></span></h2><button id="export" class="btn" disabled>导出 CSV ↓</button></div><p class="hint" id="table-hint" style="margin:0 0 12px">明细随上方“合并坡段 / 详细坡段”开关切换，与图表中的五类坡段一致。</p><div class="slope-type-legend" id="slope-type-legend" aria-label="坡段箭头图例"></div><div class="table-wrap"><table><thead><tr><th>坡段</th><th>类型</th><th>起止里程 / km</th><th>长度 / km</th><th>平均坡度</th><th>海拔变化 / m</th></tr></thead><tbody id="rows"><tr><td class="empty-row" colspan="6">导入后查看各坡段的距离与坡度</td></tr></tbody></table></div></section>
+<section class="card table-card" id="slope-details"><div class="card-title"><h2>坡段明细 <span class="count" id="table-count"></span></h2><button id="export" class="btn" disabled>导出 CSV ↓</button></div><p class="hint" id="table-hint" style="margin:0 0 12px">明细随上方“合并坡段 / 详细坡段”开关切换，与图表中的五类坡段一致。</p><div class="table-wrap"><table><thead><tr><th>序号</th><th>坡段</th><th>起止里程 / km</th><th>长度 / km</th><th>平均坡度</th><th>海拔变化 / m</th></tr></thead><tbody id="rows"><tr><td class="empty-row" colspan="6">导入后查看各坡段的距离与坡度</td></tr></tbody></table></div></section>
 <div class="bottom"><section class="card distribution"><div class="card-title"><h2>坡段构成</h2><span class="count">按距离占比</span></div><div class="stack" id="stack"></div><div id="distribution"></div></section><section class="card details" id="route-overview"><h2>路线概况</h2><div class="route-meta"><div><span>路线名称</span><strong id="route-name">—</strong></div><div><span>有效原始轨迹点</span><strong id="point-count">—</strong></div><div><span>独立轨迹段</span><strong id="track-count">—</strong></div><div><span>完整坡段 / 子段</span><strong id="segment-count">—</strong></div><div><span>分析后的最大上 / 下坡度</span><strong id="max-grade">—</strong></div></div><div class="note">最短长度用于完整上 / 下坡，不限制内部缓陡子段。整坡平均坡度仅作概要；详细模式颜色、缓陡占比和展开明细保留各子段原本的坡度。独立短轨迹会保留。</div></section></div>
 </main></div><footer>坡谱 · 让每一段起伏都有迹可循</footer>
 </div>
@@ -170,18 +170,28 @@ function displaySegments(r,mode=profileMode){
  return mode==='merged'?r.mergedProfiles:r.segments.flatMap(s=>s.children.map((c,i)=>({...c,parentId:s.id,partIndex:i+1})));
 }
 function slopeNumber(s,mode=profileMode){return mode==='merged'?String(s.number):`${s.parentId}.${s.partIndex}`;}
-function slopeArrow(type){
- const t=TYPES[type],angle=[0,-25,-55,25,55][type];
- return `<span class="slope-arrow" role="img" aria-label="${t.name}" title="${t.name}"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false" style="color:${t.color}"><g transform="rotate(${angle} 20 20)" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20H33M25 12L33 20L25 28"/></g></svg></span>`;
+function slopeThumbnail(r,s){
+ const t=TYPES[s.type],edges=r.edges;
+ let lo=0,hi=edges.length-1;
+ while(lo<hi){const mid=(lo+hi)>>1;if(edges[mid].end<=s.start+1e-7)lo=mid+1;else hi=mid;}
+ const points=[];let edgeIndex=lo;
+ for(let i=0;i<=48;i++){
+  const distance=s.start+(s.end-s.start)*i/48;
+  while(edgeIndex<edges.length-1&&edges[edgeIndex].end<distance-1e-7)edgeIndex++;
+  const edge=edges[edgeIndex];points.push({x:4+i/48*68,z:edgeElevation(edge,Math.max(edge.start,Math.min(edge.end,distance)))});
+ }
+ const min=Math.min(...points.map(p=>p.z)),max=Math.max(...points.map(p=>p.z));
+ const span=Math.max(20,(max-min)*1.25,s.length*.12),center=(min+max)/2;
+ const coords=points.map(p=>`${p.x.toFixed(2)},${(19-(p.z-center)/span*28).toFixed(2)}`).join(' ');
+ return `<span class="slope-thumbnail" role="img" aria-label="${t.name}海拔缩略图" title="${t.name} · ${gradeText(s.grade)} · ${(s.length/1000).toFixed(3)} km"><svg viewBox="0 0 76 38" aria-hidden="true" focusable="false" style="color:${t.color}"><path d="M4 35H72" fill="none" stroke="#e9ede6"/><polygon points="4,35 ${coords} 72,35" fill="currentColor" opacity=".18"/><polyline points="${coords}" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 }
 function renderSegmentRows(r,mode=profileMode){
- return displaySegments(r,mode).map(s=>`<tr data-slope-id="${slopeNumber(s,mode)}"><td>${slopeNumber(s,mode)}${mode==='detailed'?`<small class="child-count">整坡 ${s.parentId}</small>`:''}</td><td>${slopeArrow(s.type)}</td><td>${(s.start/1000).toFixed(3)} – ${(s.end/1000).toFixed(3)}</td><td>${(s.length/1000).toFixed(3)}</td><td>${gradeText(s.grade)}<small class="child-count">${mode==='merged'?'合并子段':'原始子段'}平均</small></td><td>${s.change>0?'+':''}${s.change.toFixed(1)}</td></tr>`).join('');
+ return displaySegments(r,mode).map(s=>`<tr data-slope-id="${slopeNumber(s,mode)}"><td>${slopeNumber(s,mode)}${mode==='detailed'?`<small class="child-count">整坡 ${s.parentId}</small>`:''}</td><td>${slopeThumbnail(r,s)}</td><td>${(s.start/1000).toFixed(3)} – ${(s.end/1000).toFixed(3)}</td><td>${(s.length/1000).toFixed(3)}</td><td>${gradeText(s.grade)}<small class="child-count">${mode==='merged'?'合并子段':'原始子段'}平均</small></td><td>${s.change>0?'+':''}${s.change.toFixed(1)}</td></tr>`).join('');
 }
 function renderSlopeTable(){
- $('slope-type-legend').innerHTML=TYPES.map((t,i)=>`<span>${slopeArrow(i)}${t.name}</span>`).join('');
  const modeName=profileMode==='merged'?'合并':'详细';
  $('table-count').textContent=result?`· ${modeName}模式 ${displaySegments(result).length} 段`:'';
- $('table-hint').textContent=profileMode==='merged'?'显示合并后的五类坡段，编号、颜色和坡度与图表一致。箭头角度区分缓陡，CSV 导出当前明细。':'显示全部原始缓陡子段，编号、颜色和坡度与图表一致；子段可短于最短坡段长度。CSV 导出当前明细。';
+ $('table-hint').textContent=profileMode==='merged'?'显示合并后的五类坡段，编号、颜色和坡度与图表一致。缩略图呈现各段实际海拔变化，按段独立缩放；CSV 导出当前明细。':'显示全部原始缓陡子段，编号、颜色和坡度与图表一致；子段可短于最短坡段长度。缩略图按段独立缩放；CSV 导出当前明细。';
  $('export').textContent=`导出${modeName} CSV ↓`;
  if(result)$('rows').innerHTML=renderSegmentRows(result);
 }
